@@ -1,0 +1,54 @@
+name: Build, Test, and Release
+
+on:
+  push:
+    branches: [ debian ]
+  pull_request:
+    branches: [ debian ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: earthly/actions-setup@v1
+      with:
+        version: v0.8.14
+
+    - name: Check Out Repo
+      uses: actions/checkout@v3
+
+    - name: Test
+      run: earthly +test
+  
+  release:
+    needs: build-and-test
+    if: ${{ github.ref == 'refs/heads/debian' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: earthly/actions-setup@v1
+      with:
+        version: v0.8.14
+
+    - name: Check Out Repo
+      uses: actions/checkout@v3
+
+    - name: Package
+      run: earthly +all
+
+    - name: Set Version
+      id: version
+      run: |
+        VERSION="git$(git log -1 --date=format:%Y%m%d --pretty=format:%cd).$(git rev-parse --short HEAD)"
+        echo "::set-output name=version::${VERSION}"
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        files: |
+          dist/*
+          LICENSE
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
